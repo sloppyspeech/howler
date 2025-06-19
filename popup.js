@@ -56,13 +56,12 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     const model = document.getElementById("modelSelect").value;
-    console.log("Summarizing page with model:", model);
+    console.log("Summarizing video with model:", model);
     console.log("summarizeVideoBtn clicked");
 
     // Show loading indicator
     document.getElementById("summaryOutput").innerHTML = "<p>Loading summary...</p>";
 
-    // Use the stored currentTabId here
     chrome.scripting.executeScript({
       target: { tabId: currentTabId },
       files: ["content.js"]
@@ -73,7 +72,15 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }).then(results => {
       const transcript = results[0].result;
-      sendToOllama(transcript, model, "video");
+      console.log("Transcript received in popup.js:", transcript.substring(0, 100) + '...'); // DEBUG LOG
+
+      // Check if the transcript indicates no content was found
+      if (transcript === 'No transcript found or unsupported site.') {
+        document.getElementById("summaryOutput").innerHTML = "<p style='color: orange;'>No video transcript found for this page. Please ensure captions are available or it's a YouTube video.</p>";
+        console.warn("Video summarization aborted: No transcript found.");
+      } else {
+        sendToOllama(transcript, model, "video");
+      }
     }).catch(err => {
       console.error("Failed to extract video transcript:", err);
       showMessageBox("Failed to extract video transcript.");
@@ -122,7 +129,6 @@ function sendToOllama(inputText, model, type) {
         console.log("Raw response:", text); // debug output
         const data = JSON.parse(text);
 
-        // --- NEW: Markdown parsing and sanitization ---
         // Ensure that `marked` and `DOMPurify` are loaded from popup.html
         if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
           const rawMarkdown = data.response || "No summary provided.";
@@ -136,8 +142,6 @@ function sendToOllama(inputText, model, type) {
           console.warn("Marked.js or DOMPurify.js not loaded. Displaying raw text.");
           document.getElementById("summaryOutput").innerText = data.response;
         }
-        // --- END NEW ---
-
         })
     .catch(err => {
       console.error("Fetch error:", err);

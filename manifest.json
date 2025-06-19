@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Orbit Summarizer",
+  "version": "1.0",
+  "description": "Summarize web pages and YouTube videos using a local Ollama model.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": "icons/icon48.png"
+
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "permissions": ["activeTab", "scripting", "unlimitedStorage", "storage"],
+  "host_permissions": [    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*"]
+}

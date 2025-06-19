@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Orbit Summarizer</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Local paths for Marked.js (Markdown parser) and DOMPurify.js (HTML sanitizer) -->
+  <script src="lib/marked.min.js"></script>
+  <script src="lib/purify.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h2>Orbit Summarizer</h2>
+
+    <label for="modelSelect">Choose Model:</label>
+    <select id="modelSelect">
+      <option value="gemma3:4b">gemma3:4b</option>
+      <option value="qwen3:8b">qwen3:8b</option>
+      <option value="phi4-mini-reasoning:latest">phi4</option>
+      <option value="gemma3:1b">gemma3:1b</option>
+    </select>
+
+    <button id="summarizePageBtn">Summarize Page</button>
+    <button id="summarizeVideoBtn">Summarize Video</button>
+
+    <div id="summaryOutput"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

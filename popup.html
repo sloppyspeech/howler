@@ -1,31 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Orbit Summarizer</title>
-  <link rel="stylesheet" href="styles.css" />
-  <!-- Local paths for Marked.js (Markdown parser) and DOMPurify.js (HTML sanitizer) -->
-  <script src="lib/marked.min.js"></script>
-  <script src="lib/purify.min.js"></script>
+    <meta charset="UTF-8" />
+    <title>Howler</title>
+    <link rel="stylesheet" href="styles.css" />
+    <!-- Google Fonts for modern typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="lib/marked.min.js"></script>
+    <script src="lib/purify.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h2>Orbit Summarizer</h2>
+    <div class="container">
+        <header class="app-header">
+            <h2>🎯 Howler</h2>
+        </header>
 
-    <label for="modelSelect">Choose Model:</label>
-    <select id="modelSelect">
-      <option value="gemma3:4b">gemma3:4b</option>
-      <option value="qwen3:8b">qwen3:8b</option>
-      <option value="phi4-mini-reasoning:latest">phi4</option>
-      <option value="gemma3:1b">gemma3:1b</option>
-    </select>
+        <div class="control-panel">
+            <div class="left-column">
+                <div class="model-selector">
+                    <select id="modelSelect" class="modern-select">
+                        <option value="qwen3:8b">Qwen 8B</option>      
+                        <option value="gemma3n:e4b">Gemma 4B Enhanced</option>
+                        <option value="gemma3n:e2b">Gemma 2B Enhanced</option>      
+                        <option value="gemma3:1b">Gemma 1B</option>
+                        <option value="gemma3:4b">Gemma 4B</option>
+                        <option value="deepseek-r1:8b">DeepSeek-R1 8B</option>
+                        <option value="gpt-oss:latest">GPT OSS</option>
+                        
+                    </select>
+                </div>
+                <div id="timeTaken" class="info-box">
+                    <span class="timer-icon">⏱️</span>
+                    <span class="timer-text"></span>
+                </div>
+                <div id="wordStats" class="info-box">
+                    <span class="stats-icon">📊</span>
+                    <div class="stats-text">
+                        <div>Input: <span id="inputWordCount">0</span> words</div>
+                        <div>Output: <span id="outputWordCount">0</span> words</div>
+                    </div>
+                </div>
+            </div>
 
-    <button id="summarizePageBtn">Summarize Page</button>
-    <button id="summarizeVideoBtn">Summarize Video</button>
+            <div class="action-buttons">
+                <button id="summarizePageBtn" class="modern-button">
+                    <span class="icon">📄</span> Summarize Page
+                </button>
+                <button id="summarizeVideoBtn" class="modern-button">
+                    <span class="icon">🎥</span> Summarize Video
+                </button>
+                <button id="summarizeClipboardBtn" class="modern-button">
+                    <span class="icon">📋</span> Summarize Clipboard
+                </button>
+            </div>
+        </div>
 
-    <div id="summaryOutput"></div>
-  </div>
+        <div id="summaryOutput" class="modern-output"></div>
+    </div>
 
-  <script src="popup.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>

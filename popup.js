@@ -212,11 +212,21 @@ function sendToOllama(inputText, model, type) {
     // Record start time (for final precise measurement)
     const startTime = performance.now();
     // timeTakenElement is now globally accessible
+const mindMapPrompt=` Also generate well-structured mind maps for markmap. It could look like this:   
+# Matching Mind Map Title
+## Branch 1
+### Sub Branch A
+### Sub Branch B
+## Branch 2
+  
+You can also use links, formatting and inline coding. 
+Every text must be aligned to a specific level using a new line plus the level-specific amount of #s. If you make very large enumerations with more than 6 points, not every object needs a new branch; otherwise, the mind map will be too high. In such cases, simply make one branch with a comma-separated enumeration.
+`
 
 const prompt = type === "page" 
       ? `Summarize the following webpage content comprehensively in bullet points:\n\n${inputText}`
       : type === "video" 
-      ? `Summarize the following YouTube video transcript comprehensively in bullet points & also ready to use for creating a mind map:\n\n${inputText}`
+      ? `Summarize the following YouTube video transcript comprehensively in bullet points & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points. Also include in the title the youtube URL:\n\n${inputText}`
       : `Summarize the following text comprehensively in bullet points:\n\n${inputText}`; // For clipboard
 
     console.log("======================");

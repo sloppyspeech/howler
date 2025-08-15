@@ -142,17 +142,18 @@ document.addEventListener("DOMContentLoaded", function () {
         func: getVideoTranscriptWrapper
       });
     }).then(results => {
-      const transcript = results[0].result;
-      console.log("Transcript received in popup.js:", transcript.substring(0, 100) + '...');
+      const videoData = results[0].result;
+      console.log("Video data received in popup.js:", videoData);
 
-      if (transcript === 'No transcript found or unsupported site.') {
+      if (videoData.transcript === 'No transcript found or unsupported site.') {
         document.getElementById("summaryOutput").innerHTML = "<p style='color: orange;'>No video transcript found for this page. Please ensure captions are available or it's a YouTube video.</p>";
         console.warn("Video summarization aborted: No transcript found.");
         stopTimer(); // Stop timer if no transcript
         timeTakenElement.style.visibility = 'hidden'; // Hide time tracker
         timeTakenElement.style.opacity = '0';
       } else {
-        sendToOllama(transcript, model, "video");
+        // Pass both transcript and title to sendToOllama
+        sendToOllama(videoData.transcript, model, "video", videoData.title);
       }
     }).catch(err => {
       stopTimer(); // Stop timer on error
@@ -192,6 +193,32 @@ document.getElementById("summarizeClipboardBtn").addEventListener("click", async
   });
 //
 
+    // Add copy to clipboard functionality
+    document.getElementById("copyToClipboard").addEventListener("click", async () => {
+        const summaryOutput = document.getElementById("summaryOutput");
+        
+        try {
+            // Get the text content from the summary output
+            const textToCopy = summaryOutput.textContent;
+            
+            // Copy to clipboard
+            await navigator.clipboard.writeText(textToCopy);
+            
+            // Visual feedback
+            const copyButton = document.getElementById("copyToClipboard");
+            const originalText = copyButton.innerHTML;
+            copyButton.innerHTML = '<span class="icon">✅</span> Copied!';
+            
+            // Reset button text after 2 seconds
+            setTimeout(() => {
+                copyButton.innerHTML = originalText;
+            }, 2000);
+            
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            showMessageBox("Failed to copy to clipboard");
+        }
+    });
 });
 
 // Wrapper functions needed because popup can't directly reference getPageContent
@@ -200,11 +227,14 @@ function getPageContentWrapper() {
 }
 
 function getVideoTranscriptWrapper() {
-  return window.getVideoTranscript();
+  return {
+    transcript: window.getVideoTranscript(),
+    title: document.querySelector('title').textContent
+  };
 }
 
 // Communicate with local Ollama API
-function sendToOllama(inputText, model, type) {
+function sendToOllama(inputText, model, type, videoTitle = '') {
     // Update input word count
     const inputWordCount = inputText.trim().split(/\s+/).length;
     document.getElementById('inputWordCount').textContent = inputWordCount;
@@ -226,7 +256,7 @@ Every text must be aligned to a specific level using a new line plus the level-s
 const prompt = type === "page" 
       ? `Summarize the following webpage content comprehensively in bullet points:\n\n${inputText}`
       : type === "video" 
-      ? `Summarize the following YouTube video transcript comprehensively in bullet points & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points. Also include in the title the youtube URL:\n\n${inputText}`
+      ? `Summarize the following YouTube video transcript comprehensively in bullet points & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points:\n\n${inputText}`
       : `Summarize the following text comprehensively in bullet points:\n\n${inputText}`; // For clipboard
 
     console.log("======================");
@@ -258,10 +288,14 @@ const prompt = type === "page"
 
         // Ensure that `marked` and `DOMPurify` are loaded from popup.html
         if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
-          const rawMarkdown = data.response || "No summary provided.";
-          // Convert Markdown to HTML
+          let rawMarkdown = data.response || "No summary provided.";
+          
+          // Add video title as header if it's a video summary
+          if (type === "video" && videoTitle) {
+            rawMarkdown = `# ${videoTitle}\n\n${rawMarkdown}`;
+          }
+          
           const html = marked.parse(rawMarkdown);
-          // Sanitize the HTML to prevent XSS attacks
           const cleanHtml = DOMPurify.sanitize(html);
           document.getElementById("summaryOutput").innerHTML = cleanHtml;
         } else {

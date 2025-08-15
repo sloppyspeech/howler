@@ -25,8 +25,7 @@
                         <option value="gemma3:1b">Gemma 1B</option>
                         <option value="gemma3:4b">Gemma 4B</option>
                         <option value="deepseek-r1:8b">DeepSeek-R1 8B</option>
-                        <option value="gpt-oss:latest">GPT OSS</option>
-                        
+                        <option value="command-r7b:7b">command-r7b:7b</option>                        
                     </select>
                 </div>
                 <div id="timeTaken" class="info-box">
@@ -44,18 +43,25 @@
 
             <div class="action-buttons">
                 <button id="summarizePageBtn" class="modern-button">
-                    <span class="icon">📄</span> Summarize Page
+                    <span class="icon">📄</span> ∑ Page
                 </button>
                 <button id="summarizeVideoBtn" class="modern-button">
-                    <span class="icon">🎥</span> Summarize Video
+                    <span class="icon">🎥</span> ∑ Video
                 </button>
                 <button id="summarizeClipboardBtn" class="modern-button">
-                    <span class="icon">📋</span> Summarize Clipboard
+                    <span class="icon">📋</span> ∑ Clipboard
                 </button>
             </div>
         </div>
 
-        <div id="summaryOutput" class="modern-output"></div>
+        <div class="summary-container">
+            <div class="summary-header">
+                <button id="copyToClipboard" class="copy-button">
+                    <span class="icon">📋</span> Copy
+                </button>
+            </div>
+            <div id="summaryOutput" class="modern-output"></div>
+        </div>
     </div>
 
     <script src="popup.js"></script>

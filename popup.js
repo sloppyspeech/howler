@@ -327,3 +327,48 @@ function formatDuration(seconds) {
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes} min ${remainingSeconds} sec`;
 }
+
+// Add this function to fetch available models
+async function fetchAvailableModels() {
+    try {
+        const response = await fetch('http://localhost:3000/v1/models');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return data.data || [];
+    } catch (error) {
+        console.error('Error fetching models:', error);
+        showMessageBox('Failed to fetch available models');
+        return [];
+    }
+}
+
+// Add this function to populate the model select dropdown
+function populateModelSelect(models) {
+    const modelSelect = document.getElementById('modelSelect');
+    modelSelect.innerHTML = ''; // Clear existing options
+
+    if (models.length === 0) {
+        modelSelect.innerHTML = '<option value="">No models available</option>';
+        return;
+    }
+
+    models.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.id;
+        option.textContent = model.id;
+        modelSelect.appendChild(option);
+    });
+}
+
+// Modify the DOMContentLoaded event listener to include model fetching
+document.addEventListener("DOMContentLoaded", async function () {
+    // ...existing code...
+
+    // Fetch and populate models
+    const models = await fetchAvailableModels();
+    populateModelSelect(models);
+
+    // ...existing code...
+});

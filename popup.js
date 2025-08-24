@@ -235,48 +235,46 @@ function getVideoTranscriptWrapper() {
 
 // Communicate with local Ollama API
 function sendToOllama(inputText, model, type, videoTitle = '') {
+    // Get mind map checkbox state
+    const includeMindMap = document.getElementById('includeMindMap').checked;
+    
     // Update input word count
     const inputWordCount = inputText.trim().split(/\s+/).length;
     document.getElementById('inputWordCount').textContent = inputWordCount;
 
     // Record start time (for final precise measurement)
     const startTime = performance.now();
-    // timeTakenElement is now globally accessible
-const mindMapPrompt=` Also generate well-structured mind maps for markmap. It could look like this:   
-# Matching Mind Map Title
-## Branch 1
-### Sub Branch A
-### Sub Branch B
-## Branch 2
-  
-You can also use links, formatting and inline coding. 
-Every text must be aligned to a specific level using a new line plus the level-specific amount of #s. If you make very large enumerations with more than 6 points, not every object needs a new branch; otherwise, the mind map will be too high. In such cases, simply make one branch with a comma-separated enumeration.
-`
 
-const prompt = type === "page" 
-      ? `Summarize the following webpage content comprehensively in bullet points:\n\n${inputText}`
-      : type === "video" 
-      ? `Summarize the following YouTube video transcript comprehensively in bullet points & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points:\n\n${inputText}`
-      : `Summarize the following text comprehensively in bullet points:\n\n${inputText}`; // For clipboard
+    const prompt = type === "page" 
+        ? `Summarize the following webpage content comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`
+        : type === "video" 
+        ? `Summarize the following YouTube video transcript comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`
+        : `Summarize the following text comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`; // For clipboard
 
     console.log("======================");
     console.log(JSON.stringify({model: model,prompt: prompt,stream: false})); // debug output
     console.log("======================");
 
     fetch("http://localhost:3000/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: model,
-      prompt: prompt,
-      stream: false,
-      think: false
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            model: model,
+            prompt: prompt,
+            stream: false,
+            think: false
+        })
     })
-  })
     .then(response => response.json())
     .then(data => {
-        // Update output word count
-        const outputWordCount = data.response ? data.response.trim().split(/\s+/).length : 0;
+        // Remove both types of thinking tags and their content
+        let cleanResponse = data.response
+            .replace(/<think>[\s\S]*?<\/think>/g, '')
+            .replace(/<thought>[\s\S]*?<\/thought>/g, '')
+            .trim();
+
+        // Update output word count with cleaned response
+        const outputWordCount = cleanResponse ? cleanResponse.trim().split(/\s+/).length : 0;
         document.getElementById('outputWordCount').textContent = outputWordCount;
         
         stopTimer();
@@ -288,22 +286,21 @@ const prompt = type === "page"
 
         // Ensure that `marked` and `DOMPurify` are loaded from popup.html
         if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
-          let rawMarkdown = data.response || "No summary provided.";
-          
-          // Add video title as header if it's a video summary
-          if (type === "video" && videoTitle) {
-            rawMarkdown = `# ${videoTitle}\n\n${rawMarkdown}`;
-          }
-          
-          const html = marked.parse(rawMarkdown);
-          const cleanHtml = DOMPurify.sanitize(html);
-          document.getElementById("summaryOutput").innerHTML = cleanHtml;
+            let rawMarkdown = cleanResponse || "No summary provided.";
+            
+            // Add video title as header if it's a video summary
+            if (type === "video" && videoTitle) {
+                rawMarkdown = `# ${videoTitle}\n\n${rawMarkdown}`;
+            }
+            
+            const html = marked.parse(rawMarkdown);
+            const cleanHtml = DOMPurify.sanitize(html);
+            document.getElementById("summaryOutput").innerHTML = cleanHtml;
         } else {
-          // Fallback if marked or DOMPurify are not loaded
-          console.warn("Marked.js or DOMPurify.js not loaded. Displaying raw text.");
-          document.getElementById("summaryOutput").innerText = data.response;
+            console.warn("Marked.js or DOMPurify.js not loaded. Displaying raw text.");
+            document.getElementById("summaryOutput").innerText = cleanResponse;
         }
-        })
+    })
     .catch(err => {
       stopTimer(); // Stop timer on error
       const endTime = performance.now(); // Record end time even on error
@@ -370,5 +367,28 @@ document.addEventListener("DOMContentLoaded", async function () {
     const models = await fetchAvailableModels();
     populateModelSelect(models);
 
+    // Dark mode implementation
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    
+    // Check for saved theme preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        darkModeToggle.checked = savedTheme === 'dark';
+    }
+
+    // Handle theme toggle
+    darkModeToggle.addEventListener('change', function() {
+        if (this.checked) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+        }
+    });
+
     // ...existing code...
 });
+
+

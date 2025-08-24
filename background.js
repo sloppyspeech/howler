@@ -12,7 +12,7 @@ chrome.action.onClicked.addListener((tab) => { // 'tab' object is passed to the 
       chrome.windows.create({
         url: chrome.runtime.getURL("popup.html"), // Get the full URL to popup.html within the extension
         type: "popup",                             // Specify the window type as 'popup'
-        width: 550,                                // Set a fixed width for the popup window
+        width: 650,                                // Set a fixed width for the popup window
         height: 800,                               // Set a fixed height for the popup window
         focused: true                              // Ensure the new window is focused upon creation
       }, (window) => {

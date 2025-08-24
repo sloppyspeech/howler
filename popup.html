@@ -13,6 +13,13 @@
     <div class="container">
         <header class="app-header">
             <h2>🎯 Howler</h2>
+            <div class="theme-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="darkModeToggle">
+                    <span class="slider round"></span>
+                    <span class="theme-icon">🌓</span>
+                </label>
+            </div>
         </header>
 
         <div class="control-panel">
@@ -36,23 +43,36 @@
             </div>
 
             <div class="action-buttons">
-                <button id="summarizePageBtn" class="modern-button">
-                    <span class="icon">📄</span> ∑ Page
-                </button>
-                <button id="summarizeVideoBtn" class="modern-button">
-                    <span class="icon">🎥</span> ∑ Video
-                </button>
-                <button id="summarizeClipboardBtn" class="modern-button">
-                    <span class="icon">📋</span> ∑ Clipboard
-                </button>
+                <div class="button-row">
+                    <button id="summarizePageBtn" class="modern-button">
+                        <span class="icon">📄</span> ∑ Page
+                    </button>
+                    <button id="summarizeVideoBtn" class="modern-button">
+                        <span class="icon">🎥</span> ∑ Video
+                    </button>
+                </div>
+                <div class="button-row">
+                    <button id="summarizeClipboardBtn" class="modern-button">
+                        <span class="icon">📋</span> ∑ Clipboard
+                    </button>
+                    <button id="copyToClipboard" class="copy-button modern-button">
+                        <span class="icon">📋</span> Copy
+                    </button>
+                </div>
+                <div class="button-row">
+                    <div class="mind-map-option">
+                        <label>
+                            <input type="checkbox" id="includeMindMap">
+                            <span class="icon">🗺️</span>Mind Map
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="summary-container">
             <div class="summary-header">
-                <button id="copyToClipboard" class="copy-button">
-                    <span class="icon">📋</span> Copy
-                </button>
+                <!-- Removed copy button from here -->
             </div>
             <div id="summaryOutput" class="modern-output"></div>
         </div>

@@ -235,8 +235,18 @@ function getVideoTranscriptWrapper() {
 
 // Communicate with local Ollama API
 function sendToOllama(inputText, model, type, videoTitle = '') {
+    // Store original transcript if it's a video
+    if (type === "video") {
+        chrome.storage.local.set({ 'originalTranscript': inputText });
+    } else {
+        // Clear stored transcript if not a video
+        chrome.storage.local.remove('originalTranscript');
+    }
+
+    const includeMindMap = document.getElementById("includeMindMap").getAttribute("aria-pressed") === "true";
+    
     // Get mind map checkbox state
-    const includeMindMap = document.getElementById('includeMindMap').checked;
+    // const includeMindMap = document.getElementById('includeMindMap').checked;
     
     // Update input word count
     const inputWordCount = inputText.trim().split(/\s+/).length;
@@ -388,7 +398,99 @@ document.addEventListener("DOMContentLoaded", async function () {
         }
     });
 
-    // ...existing code...
+    // Modify the save markdown functionality in the DOMContentLoaded event listener
+    document.getElementById("saveMarkdownBtn").addEventListener("click", async () => {
+        const summaryOutput = document.getElementById("summaryOutput");
+        if (!summaryOutput.textContent) {
+            showMessageBox("No content to save!");
+            return;
+        }
+
+        try {
+            // Convert HTML back to markdown
+            const htmlContent = summaryOutput.innerHTML;
+            const markdownContent = convertHtmlToMarkdown(htmlContent);
+            
+            // Get the original transcript from storage
+            chrome.storage.local.get(['originalTranscript'], function(result) {
+                let fullContent = '';
+                if (result.originalTranscript) {
+                    fullContent = `# Original Transcript\n\n${result.originalTranscript}\n\n---\n\n# Summary\n\n`;
+                }
+                fullContent += markdownContent;
+
+                // Create blob and generate URL
+                const blob = new Blob([fullContent], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                
+                // Get video title from h1 if present
+                let title = '';
+                const h1Match = htmlContent.match(/<h1.*?>(.*?)<\/h1>/);
+                if (h1Match) {
+                    title = h1Match[1]
+                        .trim()
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, '');
+                    title = '-' + title;
+                }
+                
+                // Generate filename with timestamp and optional title
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `hs${title}_${timestamp}.md`;
+
+                // Use chrome.downloads API to trigger the save dialog
+                chrome.downloads.download({
+                    url: url,
+                    filename: filename,
+                    saveAs: true
+                }, (downloadId) => {
+                    if (chrome.runtime.lastError) {
+                        showMessageBox("Error saving file: " + chrome.runtime.lastError.message);
+                    } else {
+                        showMessageBox("Summary saved successfully!");
+                    }
+                    URL.revokeObjectURL(url);
+                });
+            });
+        } catch (err) {
+            showMessageBox("Error saving file: " + err.message);
+        }
+    });
+});
+
+// Add this helper function to convert HTML back to Markdown
+function convertHtmlToMarkdown(html) {
+    // Basic HTML to Markdown conversion
+    let markdown = html
+        .replace(/<h1.*?>(.*?)<\/h1>/g, '# $1\n\n')
+        .replace(/<h2.*?>(.*?)<\/h2>/g, '## $1\n\n')
+        .replace(/<h3.*?>(.*?)<\/h3>/g, '### $1\n\n')
+        .replace(/<ul.*?>/g, '\n')
+        .replace(/<\/ul>/g, '\n')
+        .replace(/<li.*?>(.*?)<\/li>/g, '* $1\n')
+        .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
+        .replace(/<em>(.*?)<\/em>/g, '*$1*')
+        .replace(/<p.*?>(.*?)<\/p>/g, '$1\n\n')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/<br.*?>/g, '\n');
+
+    // Clean up extra newlines
+    markdown = markdown
+        .replace(/\n\s*\n\s*\n/g, '\n\n')
+        .trim();
+
+    return markdown;
+}
+
+document.getElementById("includeMindMap").addEventListener("click", function() {
+    const isPressed = this.getAttribute("aria-pressed") === "true";
+    this.setAttribute("aria-pressed", !isPressed);
+    this.classList.toggle("active");
 });
 
 

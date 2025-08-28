@@ -143,10 +143,23 @@ body {
     width: 100%;
 }
 
-.button-row .modern-button,
-.button-row .mind-map-option {
+.button-row .modern-button {
     flex: 1;
     max-width: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    position: relative;
+}
+
+#saveMarkdownBtn {
+    flex: 1;
+    max-width: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
 }
 
 .modern-button {
@@ -168,12 +181,13 @@ body {
 }
 
 .modern-button:hover {
-    background-color: var(--primary-hover);
+    background-color: var(--button-bg);
+    opacity: 0.9;
     transform: translateY(-1px);
 }
 
 .modern-button .icon {
-    font-size: 16px;
+    font-size: 1.2em;
 }
 
 .info-box {
@@ -396,4 +410,11 @@ input:checked + .slider:before {
     right: -30px;
     top: 50%;
     transform: translateY(-50%);
+}
+
+/* Style for active/checked state of mind map button */
+#includeMindMap.active,
+#includeMindMap[aria-pressed="true"] {
+    background-color: var(--primary-color);
+    color: white;
 }

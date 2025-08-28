@@ -21,7 +21,7 @@
       "js": ["content.js"]
     }
   ],
-  "permissions": ["activeTab", "scripting", "unlimitedStorage", "storage","clipboardRead" ],
+  "permissions": ["activeTab", "scripting", "unlimitedStorage", "storage","clipboardRead", "downloads" ],
   "host_permissions": [    "http://localhost:3000/*",
     "http://127.0.0.1:3000/*"]
 }

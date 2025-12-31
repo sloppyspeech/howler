@@ -60,8 +60,8 @@ function showMessageBox(message) {
 
 // Function to reset word counts
 function resetWordCounts() {
-    document.getElementById('inputWordCount').textContent = '0';
-    document.getElementById('outputWordCount').textContent = '0';
+  document.getElementById('inputWordCount').textContent = '0';
+  document.getElementById('outputWordCount').textContent = '0';
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -142,18 +142,30 @@ document.addEventListener("DOMContentLoaded", function () {
         func: getVideoTranscriptWrapper
       });
     }).then(results => {
+      if (!results || results.length === 0 || !results[0]) {
+        throw new Error("No results returned from script execution.");
+      }
+
       const videoData = results[0].result;
       console.log("Video data received in popup.js:", videoData);
 
-      if (videoData.transcript === 'No transcript found or unsupported site.') {
-        document.getElementById("summaryOutput").innerHTML = "<p style='color: orange;'>No video transcript found for this page. Please ensure captions are available or it's a YouTube video.</p>";
-        console.warn("Video summarization aborted: No transcript found.");
+      if (!videoData) {
+        throw new Error("Video data is undefined. The content script might have failed.");
+      }
+
+      if (videoData.transcript === 'No transcript found or unsupported site.' || videoData.transcript.startsWith('Error extracting transcript:')) {
+        const errorMsg = videoData.transcript.startsWith('Error extracting transcript:')
+          ? videoData.transcript
+          : "No video transcript found for this page. Please ensure captions are available or it's a YouTube video.";
+
+        document.getElementById("summaryOutput").innerHTML = `<p style='color: orange;'>${errorMsg}</p>`;
+        console.warn("Video summarization aborted:", videoData.transcript);
         stopTimer(); // Stop timer if no transcript
         timeTakenElement.style.visibility = 'hidden'; // Hide time tracker
         timeTakenElement.style.opacity = '0';
       } else {
-        // Pass both transcript and title to sendToOllama
-        sendToOllama(videoData.transcript, model, "video", videoData.title);
+        // Pass transcript, title, and url to sendToOllama
+        sendToOllama(videoData.transcript, model, "video", videoData.title, videoData.url);
       }
     }).catch(err => {
       stopTimer(); // Stop timer on error
@@ -162,8 +174,8 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("summaryOutput").innerHTML = "<p>Error extracting transcript.</p>";
     });
   });
-//
-document.getElementById("summarizeClipboardBtn").addEventListener("click", async () => {
+  //
+  document.getElementById("summarizeClipboardBtn").addEventListener("click", async () => {
     resetWordCounts(); // Add this line at the start
     const model = document.getElementById("modelSelect").value;
     console.log("Summarizing clipboard content with model:", model);
@@ -176,7 +188,7 @@ document.getElementById("summarizeClipboardBtn").addEventListener("click", async
 
       // Read from clipboard
       const clipboardText = await navigator.clipboard.readText();
-      
+
       if (!clipboardText.trim()) {
         throw new Error("Clipboard is empty");
       }
@@ -191,34 +203,34 @@ document.getElementById("summarizeClipboardBtn").addEventListener("click", async
       document.getElementById("summaryOutput").innerHTML = "<p>Error reading clipboard content.</p>";
     }
   });
-//
+  //
 
-    // Add copy to clipboard functionality
-    document.getElementById("copyToClipboard").addEventListener("click", async () => {
-        const summaryOutput = document.getElementById("summaryOutput");
-        
-        try {
-            // Get the text content from the summary output
-            const textToCopy = summaryOutput.textContent;
-            
-            // Copy to clipboard
-            await navigator.clipboard.writeText(textToCopy);
-            
-            // Visual feedback
-            const copyButton = document.getElementById("copyToClipboard");
-            const originalText = copyButton.innerHTML;
-            copyButton.innerHTML = '<span class="icon">✅</span> Copied!';
-            
-            // Reset button text after 2 seconds
-            setTimeout(() => {
-                copyButton.innerHTML = originalText;
-            }, 2000);
-            
-        } catch (err) {
-            console.error('Failed to copy text: ', err);
-            showMessageBox("Failed to copy to clipboard");
-        }
-    });
+  // Add copy to clipboard functionality
+  document.getElementById("copyToClipboard").addEventListener("click", async () => {
+    const summaryOutput = document.getElementById("summaryOutput");
+
+    try {
+      // Get the text content from the summary output
+      const textToCopy = summaryOutput.textContent;
+
+      // Copy to clipboard
+      await navigator.clipboard.writeText(textToCopy);
+
+      // Visual feedback
+      const copyButton = document.getElementById("copyToClipboard");
+      const originalText = copyButton.innerHTML;
+      copyButton.innerHTML = '<span class="icon">✅</span> Copied!';
+
+      // Reset button text after 2 seconds
+      setTimeout(() => {
+        copyButton.innerHTML = originalText;
+      }, 2000);
+
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+      showMessageBox("Failed to copy to clipboard");
+    }
+  });
 });
 
 // Wrapper functions needed because popup can't directly reference getPageContent
@@ -227,89 +239,109 @@ function getPageContentWrapper() {
 }
 
 function getVideoTranscriptWrapper() {
-  return {
-    transcript: window.getVideoTranscript(),
-    title: document.querySelector('title').textContent
-  };
+  try {
+    const transcript = typeof window.getVideoTranscript === 'function'
+      ? window.getVideoTranscript()
+      : 'Error: window.getVideoTranscript is not a function';
+
+    const titleElement = document.querySelector('title');
+    const title = titleElement ? titleElement.textContent : (document.title || 'Unknown Title');
+
+    return {
+      transcript: transcript,
+      title: title,
+      url: window.location.href
+    };
+  } catch (e) {
+    return {
+      transcript: 'Error extracting transcript: ' + e.message,
+      title: document.title || 'Unknown Title',
+      url: window.location.href
+    };
+  }
 }
 
 // Communicate with local Ollama API
-function sendToOllama(inputText, model, type, videoTitle = '') {
-    // Store original transcript if it's a video
-    if (type === "video") {
-        chrome.storage.local.set({ 'originalTranscript': inputText });
-    } else {
-        // Clear stored transcript if not a video
-        chrome.storage.local.remove('originalTranscript');
+function sendToOllama(inputText, model, type, videoTitle = '', videoUrl = '') {
+  // Store original transcript if it's a video
+  if (type === "video") {
+    chrome.storage.local.set({ 'originalTranscript': inputText });
+    // Also store the provided video URL to extract video ID later
+    if (videoUrl) {
+      chrome.storage.local.set({ 'videoUrl': videoUrl });
     }
+  } else {
+    // Clear stored transcript and video URL if not a video
+    chrome.storage.local.remove(['originalTranscript', 'videoUrl']);
+  }
 
-    const includeMindMap = document.getElementById("includeMindMap").getAttribute("aria-pressed") === "true";
-    
-    // Get mind map checkbox state
-    // const includeMindMap = document.getElementById('includeMindMap').checked;
-    
-    // Update input word count
-    const inputWordCount = inputText.trim().split(/\s+/).length;
-    document.getElementById('inputWordCount').textContent = inputWordCount;
+  const includeMindMap = document.getElementById("includeMindMap").getAttribute("aria-pressed") === "true";
 
-    // Record start time (for final precise measurement)
-    const startTime = performance.now();
+  // Get mind map checkbox state
+  // const includeMindMap = document.getElementById('includeMindMap').checked;
 
-    const prompt = type === "page" 
-        ? `Summarize the following webpage content comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`
-        : type === "video" 
-        ? `Summarize the following YouTube video transcript comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`
-        : `Summarize the following text comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`; // For clipboard
+  // Update input word count
+  const inputWordCount = inputText.trim().split(/\s+/).length;
+  document.getElementById('inputWordCount').textContent = inputWordCount;
 
-    console.log("======================");
-    console.log(JSON.stringify({model: model,prompt: prompt,stream: false})); // debug output
-    console.log("======================");
+  // Record start time (for final precise measurement)
+  const startTime = performance.now();
 
-    fetch("http://localhost:3000/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            model: model,
-            prompt: prompt,
-            stream: false,
-            think: false
-        })
+  const prompt = type === "page"
+    ? `Summarize the following webpage content comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`
+    : type === "video"
+      ? `Summarize the following YouTube video transcript comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`
+      : `Summarize the following text comprehensively in bullet points${includeMindMap ? " & Create a mind map in markdown language from the following content. Include relevant topics, tools, and methodologies to clearly show the key points" : ""}:\n\n${inputText}`; // For clipboard
+
+  console.log("======================");
+  console.log(JSON.stringify({ model: model, prompt: prompt, stream: false })); // debug output
+  console.log("======================");
+
+  fetch("http://localhost:3000/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: model,
+      prompt: prompt,
+      stream: false,
+      think: false
     })
+  })
     .then(response => response.json())
     .then(data => {
-        // Remove both types of thinking tags and their content
-        let cleanResponse = data.response
-            .replace(/<think>[\s\S]*?<\/think>/g, '')
-            .replace(/<thought>[\s\S]*?<\/thought>/g, '')
-            .trim();
+      // Remove both types of thinking tags and their content
+      let cleanResponse = data.response
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/<thought>[\s\S]*?<\/thought>/g, '')
+        .trim();
 
-        // Update output word count with cleaned response
-        const outputWordCount = cleanResponse ? cleanResponse.trim().split(/\s+/).length : 0;
-        document.getElementById('outputWordCount').textContent = outputWordCount;
-        
-        stopTimer();
-        const endTime = performance.now();
-        const duration = ((endTime - startTime) / 1000).toFixed(2);
-        const formattedDuration = formatDuration(duration);
-        
-        timeTakenElement.innerHTML = `<span class="timer-icon">⏱️</span><span class="timer-text">Summarized in: ${formattedDuration}</span>`;
+      // Update output word count with cleaned response
+      const outputWordCount = cleanResponse ? cleanResponse.trim().split(/\s+/).length : 0;
+      document.getElementById('outputWordCount').textContent = outputWordCount;
 
-        // Ensure that `marked` and `DOMPurify` are loaded from popup.html
-        if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
-            let rawMarkdown = cleanResponse || "No summary provided.";
-            
-            // Add video title as header if it's a video summary
-            if (type === "video" && videoTitle) {
-                rawMarkdown = `# ${videoTitle}\n\n${rawMarkdown}`;
-            }
-            
-            const html = marked.parse(rawMarkdown);
-            const cleanHtml = DOMPurify.sanitize(html);
-            document.getElementById("summaryOutput").innerHTML = cleanHtml;
-        } else {
-            console.warn("Marked.js or DOMPurify.js not loaded. Displaying raw text.");
-            document.getElementById("summaryOutput").innerText = cleanResponse;
+      stopTimer();
+      const endTime = performance.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      const formattedDuration = formatDuration(duration);
+
+      timeTakenElement.innerHTML = `<span class="timer-icon">⏱️</span><span class="timer-text">Summarized in: ${formattedDuration}</span>`;
+
+      // Ensure that `marked` and `DOMPurify` are loaded from popup.html
+      if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+        let rawMarkdown = cleanResponse || "No summary provided.";
+
+        // Add video title as header if it's a video summary
+        if (type === "video" && videoTitle) {
+          rawMarkdown = `# ${videoTitle}\n\n${rawMarkdown}`;
         }
+
+        const html = marked.parse(rawMarkdown);
+        const cleanHtml = DOMPurify.sanitize(html);
+        document.getElementById("summaryOutput").innerHTML = cleanHtml;
+      } else {
+        console.warn("Marked.js or DOMPurify.js not loaded. Displaying raw text.");
+        document.getElementById("summaryOutput").innerText = cleanResponse;
+      }
     })
     .catch(err => {
       stopTimer(); // Stop timer on error
@@ -327,170 +359,297 @@ function sendToOllama(inputText, model, type, videoTitle = '') {
 
 // Add this new function before sendToOllama
 function formatDuration(seconds) {
-    if (seconds < 60) {
-        return `${seconds} seconds`;
-    }
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes} min ${remainingSeconds} sec`;
+  if (seconds < 60) {
+    return `${seconds} seconds`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes} min ${remainingSeconds} sec`;
 }
 
 // Add this function to fetch available models
 async function fetchAvailableModels() {
-    try {
-        const response = await fetch('http://localhost:3000/v1/models');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        return data.data || [];
-    } catch (error) {
-        console.error('Error fetching models:', error);
-        showMessageBox('Failed to fetch available models');
-        return [];
+  try {
+    const response = await fetch('http://localhost:3000/v1/models');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching models:', error);
+    showMessageBox('Failed to fetch available models');
+    return [];
+  }
 }
 
 // Add this function to populate the model select dropdown
 function populateModelSelect(models) {
-    const modelSelect = document.getElementById('modelSelect');
-    modelSelect.innerHTML = ''; // Clear existing options
+  const modelSelect = document.getElementById('modelSelect');
+  modelSelect.innerHTML = ''; // Clear existing options
 
-    if (models.length === 0) {
-        modelSelect.innerHTML = '<option value="">No models available</option>';
-        return;
-    }
+  if (models.length === 0) {
+    modelSelect.innerHTML = '<option value="">No models available</option>';
+    return;
+  }
 
-    models.forEach(model => {
-        const option = document.createElement('option');
-        option.value = model.id;
-        option.textContent = model.id;
-        modelSelect.appendChild(option);
-    });
+  models.forEach(model => {
+    const option = document.createElement('option');
+    option.value = model.id;
+    option.textContent = model.id;
+    modelSelect.appendChild(option);
+  });
 }
 
 // Modify the DOMContentLoaded event listener to include model fetching
 document.addEventListener("DOMContentLoaded", async function () {
-    // ...existing code...
+  // ...existing code...
 
-    // Fetch and populate models
-    const models = await fetchAvailableModels();
-    populateModelSelect(models);
+  // Fetch and populate models
+  const models = await fetchAvailableModels();
+  populateModelSelect(models);
 
-    // Dark mode implementation
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    
-    // Check for saved theme preference
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        darkModeToggle.checked = savedTheme === 'dark';
+  // Dark mode implementation
+  const darkModeToggle = document.getElementById('darkModeToggle');
+
+  // Check for saved theme preference
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    darkModeToggle.checked = savedTheme === 'dark';
+  }
+
+  // Handle theme toggle
+  darkModeToggle.addEventListener('change', function () {
+    if (this.checked) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  });
+
+  // Modify the save markdown functionality in the DOMContentLoaded event listener
+  document.getElementById("saveMarkdownBtn").addEventListener("click", async () => {
+    const summaryOutput = document.getElementById("summaryOutput");
+    if (!summaryOutput.textContent) {
+      showMessageBox("No content to save!");
+      return;
     }
 
-    // Handle theme toggle
-    darkModeToggle.addEventListener('change', function() {
-        if (this.checked) {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
+    try {
+      // Get the selected model
+      const selectedModel = document.getElementById('modelSelect').value;
+
+      // Convert HTML back to markdown
+      const htmlContent = summaryOutput.innerHTML;
+      const markdownContent = convertHtmlToMarkdown(htmlContent);
+
+      // Get the original transcript and video URL from storage
+      chrome.storage.local.get(['originalTranscript', 'videoUrl'], function (result) {
+        let fullContent = `Model Used: ${selectedModel}\n\n`; // Add model info at the start
+
+        // Extract and add YouTube video ID if available
+        if (result.videoUrl) {
+          const url = result.videoUrl;
+          let videoId = '';
+          // Handle various YouTube URL formats
+          const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/.*[?&]v=([a-zA-Z0-9_-]{11})/
+          ];
+
+          for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+              videoId = match[1];
+              break;
+            }
+          }
+
+          if (videoId) {
+            fullContent += `Video ID: ${videoId}\n\n`;
+          }
+        }
+
+        fullContent += `---\n\n`;
+
+        if (result.originalTranscript) {
+          fullContent += `# Original Transcript\n\n${result.originalTranscript}\n\n---\n\n# Summary\n\n`;
+        }
+        fullContent += markdownContent;
+
+        // Create blob and generate URL
+        const blob = new Blob([fullContent], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+
+        // Get video title from h1 if present
+        let title = '';
+        const h1Match = htmlContent.match(/<h1.*?>(.*?)<\/h1>/);
+        if (h1Match) {
+          title = h1Match[1]
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+          title = '-' + title;
+        }
+
+        // Generate filename with timestamp and optional title
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `hs${title}_${timestamp}.md`;
+
+        // Use chrome.downloads API to trigger the save dialog
+        chrome.downloads.download({
+          url: url,
+          filename: filename,
+          saveAs: true
+        }, (downloadId) => {
+          if (chrome.runtime.lastError) {
+            showMessageBox("Error saving file: " + chrome.runtime.lastError.message);
+          } else {
+            showMessageBox("Summary saved successfully!");
+          }
+          URL.revokeObjectURL(url);
+        });
+      });
+    } catch (err) {
+      showMessageBox("Error saving file: " + err.message);
+    }
+  });
+
+  // Add JSON save functionality
+  document.getElementById("saveJsonBtn").addEventListener("click", async () => {
+    const summaryOutput = document.getElementById("summaryOutput");
+    if (!summaryOutput.textContent) {
+      showMessageBox("No content to save!");
+      return;
+    }
+
+    try {
+      // Get the original transcript and video URL from storage
+      chrome.storage.local.get(['originalTranscript', 'videoUrl'], function (result) {
+        const htmlContent = summaryOutput.innerHTML;
+        const markdownContent = convertHtmlToMarkdown(htmlContent);
+
+        // Extract summary and mindmap sections
+        let summary = '';
+        let mindmap = '';
+
+        // Check if content has a mind map section
+        const mindmapMatch = markdownContent.match(/##?\s*Mind\s*Map[\s\S]*/i);
+        if (mindmapMatch) {
+          mindmap = mindmapMatch[0].trim();
+          // Summary is everything before the mindmap
+          summary = markdownContent.substring(0, mindmapMatch.index).trim();
         } else {
-            document.documentElement.setAttribute('data-theme', 'light');
-            localStorage.setItem('theme', 'light');
-        }
-    });
-
-    // Modify the save markdown functionality in the DOMContentLoaded event listener
-    document.getElementById("saveMarkdownBtn").addEventListener("click", async () => {
-        const summaryOutput = document.getElementById("summaryOutput");
-        if (!summaryOutput.textContent) {
-            showMessageBox("No content to save!");
-            return;
+          // No mindmap, everything is summary
+          summary = markdownContent.trim();
         }
 
-        try {
-            // Convert HTML back to markdown
-            const htmlContent = summaryOutput.innerHTML;
-            const markdownContent = convertHtmlToMarkdown(htmlContent);
-            
-            // Get the original transcript from storage
-            chrome.storage.local.get(['originalTranscript'], function(result) {
-                let fullContent = '';
-                if (result.originalTranscript) {
-                    fullContent = `# Original Transcript\n\n${result.originalTranscript}\n\n---\n\n# Summary\n\n`;
-                }
-                fullContent += markdownContent;
+        // Remove the video title h1 from summary if present
+        summary = summary.replace(/^#\s+.*?\n\n/, '');
 
-                // Create blob and generate URL
-                const blob = new Blob([fullContent], { type: 'text/markdown' });
-                const url = URL.createObjectURL(blob);
-                
-                // Get video title from h1 if present
-                let title = '';
-                const h1Match = htmlContent.match(/<h1.*?>(.*?)<\/h1>/);
-                if (h1Match) {
-                    title = h1Match[1]
-                        .trim()
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, '-')
-                        .replace(/^-+|-+$/g, '');
-                    title = '-' + title;
-                }
-                
-                // Generate filename with timestamp and optional title
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `hs${title}_${timestamp}.md`;
+        // Extract YouTube video ID from URL
+        let videoId = '';
+        if (result.videoUrl) {
+          const url = result.videoUrl;
+          // Handle various YouTube URL formats
+          const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/.*[?&]v=([a-zA-Z0-9_-]{11})/
+          ];
 
-                // Use chrome.downloads API to trigger the save dialog
-                chrome.downloads.download({
-                    url: url,
-                    filename: filename,
-                    saveAs: true
-                }, (downloadId) => {
-                    if (chrome.runtime.lastError) {
-                        showMessageBox("Error saving file: " + chrome.runtime.lastError.message);
-                    } else {
-                        showMessageBox("Summary saved successfully!");
-                    }
-                    URL.revokeObjectURL(url);
-                });
-            });
-        } catch (err) {
-            showMessageBox("Error saving file: " + err.message);
+          for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1]) {
+              videoId = match[1];
+              break;
+            }
+          }
         }
-    });
+
+        // Create JSON structure
+        const jsonData = {
+          "VideoID": videoId,
+          "Original_Transcript": result.originalTranscript || "",
+          "Summary": summary,
+          "MindMap": mindmap
+        };
+
+        // Create blob and generate URL
+        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        // Get video title from h1 if present
+        let title = '';
+        const h1Match = htmlContent.match(/<h1.*?>(.*?)<\/h1>/);
+        if (h1Match) {
+          title = h1Match[1]
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+          title = '-' + title;
+        }
+
+        // Generate filename with timestamp and optional title
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `hs${title}_${timestamp}.json`;
+
+        // Use chrome.downloads API to trigger the save dialog
+        chrome.downloads.download({
+          url: url,
+          filename: filename,
+          saveAs: true
+        }, (downloadId) => {
+          if (chrome.runtime.lastError) {
+            showMessageBox("Error saving file: " + chrome.runtime.lastError.message);
+          } else {
+            showMessageBox("JSON saved successfully!");
+          }
+          URL.revokeObjectURL(url);
+        });
+      });
+    } catch (err) {
+      showMessageBox("Error saving file: " + err.message);
+    }
+  });
 });
 
 // Add this helper function to convert HTML back to Markdown
 function convertHtmlToMarkdown(html) {
-    // Basic HTML to Markdown conversion
-    let markdown = html
-        .replace(/<h1.*?>(.*?)<\/h1>/g, '# $1\n\n')
-        .replace(/<h2.*?>(.*?)<\/h2>/g, '## $1\n\n')
-        .replace(/<h3.*?>(.*?)<\/h3>/g, '### $1\n\n')
-        .replace(/<ul.*?>/g, '\n')
-        .replace(/<\/ul>/g, '\n')
-        .replace(/<li.*?>(.*?)<\/li>/g, '* $1\n')
-        .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
-        .replace(/<em>(.*?)<\/em>/g, '*$1*')
-        .replace(/<p.*?>(.*?)<\/p>/g, '$1\n\n')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/<br.*?>/g, '\n');
+  // Basic HTML to Markdown conversion
+  let markdown = html
+    .replace(/<h1.*?>(.*?)<\/h1>/g, '# $1\n\n')
+    .replace(/<h2.*?>(.*?)<\/h2>/g, '## $1\n\n')
+    .replace(/<h3.*?>(.*?)<\/h3>/g, '### $1\n\n')
+    .replace(/<ul.*?>/g, '\n')
+    .replace(/<\/ul>/g, '\n')
+    .replace(/<li.*?>(.*?)<\/li>/g, '* $1\n')
+    .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
+    .replace(/<em>(.*?)<\/em>/g, '*$1*')
+    .replace(/<p.*?>(.*?)<\/p>/g, '$1\n\n')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/<br.*?>/g, '\n');
 
-    // Clean up extra newlines
-    markdown = markdown
-        .replace(/\n\s*\n\s*\n/g, '\n\n')
-        .trim();
+  // Clean up extra newlines
+  markdown = markdown
+    .replace(/\n\s*\n\s*\n/g, '\n\n')
+    .trim();
 
-    return markdown;
+  return markdown;
 }
 
-document.getElementById("includeMindMap").addEventListener("click", function() {
-    const isPressed = this.getAttribute("aria-pressed") === "true";
-    this.setAttribute("aria-pressed", !isPressed);
-    this.classList.toggle("active");
+document.getElementById("includeMindMap").addEventListener("click", function () {
+  const isPressed = this.getAttribute("aria-pressed") === "true";
+  this.setAttribute("aria-pressed", !isPressed);
+  this.classList.toggle("active");
 });
 
 

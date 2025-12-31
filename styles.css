@@ -83,11 +83,18 @@ body {
     margin-bottom: 16px;
 }
 
-.left-column, .action-buttons {
+.left-column {
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* Distributes space evenly */
-    height: 120px; /* Fixed height to match 3 buttons */
+    justify-content: space-between;
+    height: 120px; /* Fixed height to match info boxes */
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
 }
 
 .model-selector {
@@ -129,18 +136,18 @@ body {
     color: var(--text-color);
 }
 
-.action-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-}
+
 
 .button-row {
     display: flex;
     justify-content: center;
     gap: 10px;
     width: 100%;
+}
+
+/* Add margin to the last button row (Save JSON) */
+.button-row:last-child {
+    margin-bottom: 12px;
 }
 
 .button-row .modern-button {
